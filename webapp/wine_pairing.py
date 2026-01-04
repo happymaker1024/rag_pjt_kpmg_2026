@@ -104,8 +104,10 @@ def wine_pairing(img_urls):
     })
     # 최종결과 return
     return res
-if __name__ == "__main__":
-    
-    img_urls = 'https://sitem.ssgcdn.com/95/55/96/item/1000346965595_i1_750.jpg'
-    print(wine_pairing(img_urls))
 
+if __name__ == "__main__":
+
+    img_url = input("image url을 입력하세요. >> ")
+    # img_url = 'https://sitem.ssgcdn.com/95/55/96/item/1000346965595_i1_750.jpg'
+    # img_url = 'https://www.sbfoods-worldwide.com/ko/recipes/deq4os00000008l9-img/10_Stake_A.jpg'
+    print(wine_pairing(img_url))
