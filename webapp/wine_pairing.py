@@ -1,4 +1,4 @@
-from langchain_core.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
 from langchain_openai import ChatOpenAI
 from langchain_core.runnables import RunnableLambda
@@ -12,36 +12,42 @@ load_dotenv("../.env", override=True)
 
 # LLM을 통한 요리 이미지 -> 맛 풍미
 # image 에서 맛(풍미)에 대한 설명 text 생성
+from langchain_core.messages import HumanMessage, SystemMessage
+
 def describe_dish_flavor(query):
-    # pass
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", """
-            Persona: You are a highly skilled and perceptive culinary expert with a deep understanding of flavors, aromas, and textures in a wide variety of cuisines. Your personality is professional, insightful, and approachable, dedicated to helping users understand and appreciate the complexities of taste in their food experiences. You are passionate about exploring subtle nuances in ingredients and dishes, making flavor analysis accessible and engaging.
+    """
+    query = {
+        "image_base64": "..."
+    }
+    """
 
-            Role: Your role is to guide users in understanding and analyzing the taste, aroma, texture, and overall flavor profile of various foods. You provide detailed descriptions of flavors and offer insights into how different ingredients, cooking techniques, and seasonings influence the dish's final taste. You also help users make informed choices about ingredient combinations and cooking methods to achieve desired flavors in their culinary creations.
-            Examples:
-            Flavor Profile Analysis: If a user describes a dish with grilled lamb seasoned with rosemary and garlic, you might explain how the earthy, woody notes of rosemary enhance the rich, savory flavor of the lamb. You could also describe how the caramelization from grilling adds a layer of smokiness, balanced by the mild sweetness of roasted garlic.
-            Texture and Mouthfeel Explanation: If a user is tasting a creamy mushroom risotto, you might highlight the importance of the dish’s creamy, velvety texture achieved through the slow release of starch from Arborio rice. You could also mention how the umami-rich flavor of mushrooms adds depth to the dish, while the cheese provides a slight saltiness that balances the creaminess.
-            Pairing Suggestions: If a user is preparing a spicy Thai green curry, you could recommend balancing its heat with a slightly sweet or acidic side, such as a cucumber salad or coconut rice. You might explain how the coolness of cucumber contrasts with the curry’s heat, and how the subtle sweetness in coconut rice tempers the dish’s spiciness, creating a harmonious dining experience.
-         """),
-        ("human", """
-            이미지의 요리명과 풍미를 한 문장으로 요약해 주세요. 영어로 표현해 주세요.
-        """)
-    ])
+    messages = [
+        SystemMessage(content="""
+            You are a highly skilled culinary expert.
+            Identify the dish and summarize its flavor profile in one concise English sentence.
+            """),
+        HumanMessage(
+            content=[
+                {"type": "text", "text": "Analyze the dish shown in the image."},
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{query['image_base64']}"
+                    }
+                }
+            ]
+        )
+    ]
 
-    # image url list
-    template = []
+    llm = ChatOpenAI(
+        model="gpt-4o-mini",
+        temperature=0,
+        max_tokens=300
+    )
 
-    if query.get("image_urls"):
-        template += [{"image_url": image_url} for image_url in query["image_urls"]]
+    response = llm.invoke(messages)
 
-    prompt += HumanMessagePromptTemplate.from_template(template)
-
-    llm = ChatOpenAI(model="gpt-4o", temperature=0, max_tokens=4095)
-
-    chain = prompt | llm | StrOutputParser()
-
-    return chain
+    return response.content
 
 # 음식에 맛는 와인 top-5 검색
 def search_wines(dish_flavor):
@@ -52,7 +58,7 @@ def search_wines(dish_flavor):
         namespace=os.getenv("PINECONE_NAMESPACE")
     )
 
-    results =  vector_store.similarity_search(dish_flavor, namespace=os.getenv("PINECONE_NAMESPACE"), k=5)
+    results =  vector_store.similarity_search(dish_flavor, k=5)
 
     return {
         "dish_flavor": dish_flavor,
@@ -86,28 +92,34 @@ def recommand_wines(query):
         """)
     ])
     
-    llm = ChatOpenAI(model="gpt-4o", temperature=0, max_tokens=4095)
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0, max_tokens=4095)
     # chain = prompt | llm | StrOutputParser()
     chain = prompt | llm | JsonOutputParser()
 
-    return chain
+    return chain.invoke(query)
 
 # wine pairing 함수
-def wine_pairing(img_urls):
+def wine_pairing(image_base64: str):
     r1 = RunnableLambda(describe_dish_flavor)
     r2 = RunnableLambda(search_wines)
     r3 = RunnableLambda(recommand_wines)
 
     chain = r1 | r2 | r3
     res = chain.invoke({
-        "image_urls": [img_urls]
+        "image_base64": image_base64
     })
     # 최종결과 return
     return res
 
 if __name__ == "__main__":
+    import base64
 
-    img_url = input("image url을 입력하세요. >> ")
-    # img_url = 'https://sitem.ssgcdn.com/95/55/96/item/1000346965595_i1_750.jpg'
-    # img_url = 'https://www.sbfoods-worldwide.com/ko/recipes/deq4os00000008l9-img/10_Stake_A.jpg'
-    print(wine_pairing(img_url))
+    # 파일 경로 : ..\prepare\images\eye_catch_sushi.jpg
+    image_path = input("이미지 파일 경로를 입력하세요. >> ")
+
+    with open(image_path, "rb") as f:
+        image_bytes = f.read()
+
+    image_base64 = base64.b64encode(image_bytes).decode("utf-8")
+
+    print(wine_pairing(image_base64))

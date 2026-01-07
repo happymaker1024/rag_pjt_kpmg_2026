@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Wine Pairing</title>
+
+    <!-- Bootstrap 5.3 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Project styles -->
+    <link href="/static/css/style.css" rel="stylesheet">
+</head>
+
+<body class="bg-light">
+<div class="container py-5">
+
+    <h1 class="mb-4 text-center">🍷 Wine Pairing</h1>
+
+    <!-- 이미지 업로드 폼 -->
+    <form id="uploadForm" class="card p-4 shadow-sm" enctype="multipart/form-data">
+        <div class="mb-3">
+            <label class="form-label">요리 이미지 선택</label>
+            <input class="form-control" type="file" name="file" accept="image/*" required>
+        </div>
+
+        <div class="row g-2">
+            <div class="col">
+                <button type="submit" class="btn btn-primary w-100">
+                    와인 추천 받기
+                </button>
+            </div>
+
+            <div class="col">
+                <button type="reset" class="btn btn-outline-secondary w-100">
+                    다시하기
+                </button>
+            </div>
+        </div>
+    </form>
+
+<!-- 결과 출력 -->
+<div id="result" class="card mt-4 d-none">
+    <div class="card-body text-center">
+
+        <!-- 로딩 스피너 -->
+        <div id="loading" class="my-3 d-none">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-2 mb-0">분석 중입니다...</p>
+        </div>
+
+        <!-- 결과 내용 -->
+        <div id="resultContent" class="d-none text-start">
+            <h5 class="card-title mb-3">🍷 추천 와인</h5>
+            <h6 class="fw-bold text-primary" id="wineName"></h6>
+            <p class="mt-3 mb-0" id="wineReason"></p>
+        </div>
+
+        <!-- 에러 -->
+        <div id="errorMsg" class="text-danger d-none"></div>
+
+    </div>
+</div>
+
+<script>
+document.getElementById("uploadForm").addEventListener("submit", async function(e) {
+    e.preventDefault();
+
+    const formData = new FormData(this);
+    const submitBtn = this.querySelector('[type="submit"]');
+
+    const resultDiv = document.getElementById("result");
+    const loading = document.getElementById("loading");
+    const content = document.getElementById("resultContent");
+    const errorMsg = document.getElementById("errorMsg");
+
+    // 초기 상태
+    submitBtn.disabled = true;
+    resultDiv.classList.remove("d-none");
+    loading.classList.remove("d-none");
+    content.classList.add("d-none");
+    errorMsg.classList.add("d-none");
+
+    try {
+        const response = await fetch("/wine-pairing", {
+            method: "POST",
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.detail || "서버 오류");
+        }
+
+        // 결과 렌더링
+        renderResult(data.result);
+
+        loading.classList.add("d-none");
+        content.classList.remove("d-none");
+
+    } catch (err) {
+        loading.classList.add("d-none");
+        errorMsg.innerText = err.message;
+        errorMsg.classList.remove("d-none");
+    } finally {
+        submitBtn.disabled = false;
+    }
+});
+
+function renderResult(data) {
+    document.getElementById("wineName").innerText =
+        data.recommend_wine;
+
+    document.getElementById("wineReason").innerText =
+        data.recommend_reason;
+}
+</script>
+
+
+<!-- Bootstrap JS (optional, for interactive components) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+</html>
